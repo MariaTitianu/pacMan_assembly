@@ -43,7 +43,7 @@ buton_y equ 10
 buton_size equ 40
 
 error_iesire_matrice db "Ati incercat sa desenati un pixel pe afara: x = %d, y = %d, culoare = %x",13,10,0
-error_suprapunere_culoare_diferita db "Well...s-ar pus o alta culoare: x = %d, y = %d, culoare = %x",13,10,0
+error_suprapunere_culoare_diferita db "Well...s-a pus o alta culoare: x = %d, y = %d, culoare = %x",13,10,0
 
 .code
 ; procedura make_text afiseaza o litera sau o cifra la coordonatele date
@@ -104,12 +104,12 @@ _make_pixel endp
 
 make_pixel macro x, y, culoare
 	pusha
-	mov ebx, culoare
-	mov edx, y
-	mov eax, x
+	mov esi, culoare
+	mov edi, y
+	mov ebx, x
+	push esi
+	push edi
 	push ebx
-	push edx
-	push eax
 	call _make_pixel
 	add esp, 12
 	popa
@@ -190,19 +190,12 @@ endm
 _linie_orizontala proc 
 	push EBP
 	mov EBP, ESP 
-;corp_procedura
-	mov eax, [ebp+12]	;eax = y
-	mov ebx,area_width
-	mul ebx  ;eax = y* area_width
-	add eax,[ebp+8]	;eax= y* area_width+x
-	shl eax, 2;eax= (y* area_width+x)*4
-	add eax, area
-	mov ecx,[ebp+16]	; mov ecx,len
+;corp_procedura	
+	mov ecx, [ebp + 16]
+	mov eax, [ebp + 8]
 bucla_linie:
-	
-	mov edi, [ebp+20]
-	mov dword ptr[eax], edi
-	add eax,4
+	make_pixel eax, [ebp+12], [ebp+20]
+	add eax, 1
 	loop bucla_linie
 ;end corp
 	mov ESP, EBP
@@ -226,20 +219,14 @@ linie_orizontala macro x, y, len, culoare
 endm
 
 _linie_verticala proc
-	push EBP
+ 	push EBP
 	mov EBP, ESP 
-;corp_procedura
-	mov eax, [ebp+12]	;eax = y
-	mov ebx,area_width
-	mul ebx  ;eax = y* area_width
-	add eax,[ebp+8]	;eax= y* area_width+x
-	shl eax, 2;eax= (y* area_width+x)*4
-	add eax, area
-	mov ecx,[ebp+16]	; mov ecx,len
+;corp_procedura	
+	mov ecx, [ebp + 16]
+	mov eax, [ebp+12]
 bucla_linie:
-	mov edi, [ebp+20]
-	mov dword ptr[eax], edi
-	add eax, area_width*4
+	make_pixel [ebp + 8], eax, [ebp+20]
+	add eax, 1
 	loop bucla_linie
 ;end corp
 	mov ESP, EBP
@@ -263,58 +250,55 @@ linie_verticala macro x, y, len, culoare
 endm
 
 
-_Drept proc
+_Drept_gol  proc
 	push EBP
-	mov EBP, ESP
-	mov ebx, [ebp+8]
-	mov eax, ebx
-	mov edi, [ebp+12]
-	; ecx = x, edx=y ,ebx= len= size, edi = culoare
-	linie_orizontala ecx, edx, [ebp + 8], [ebp + 12]
-	; push edi 
-	; push ebx
-	; push edx
-	; push ecx
-	; call linie_orizontala
-	; add ESP, 16
-	; add eax, edx ; eax = size+y
-	; ecx = x, eax=size+y ,ebx= len= size, edi = culoare
-	; push edi
-	; push ebx
-	; push eax
-	; push ecx
-	; call linie_orizontala
-	; add ESP, 16
-	; ecx = x, edx=y ,ebx= len= size, edi = culoare
-	; push edi 
-	; push ebx
-	; push edx
-	; push ecx
-	; call linie_verticala	
-	; add ESP, 16 
-	; sub eax,ebx ; eax = y
-	; add eax, ecx ;eax = y+x
-	; eax = x+y, edx=y ,ebx= len= size, edi = culoare
-	; push edi 
-	; push ebx
-	; push edx
-	; push eax
-	; CALL linie_verticala
+	mov EBP, ESP 
+	;corp procedura
+
+	;end procedura
 	mov ESP, EBP
 	pop EBP
 	ret
-_Drept endp
+_Drept_gol endp
 
-drept macro culoare, x, y, marime
+drept_gol macro x, y,lungime,latime,gros,culoare
 	pusha
-	mov ECX, x
-	mov EDX, y
-	mov eax, culoare
-	mov ebx, marime
-	push eax
-	push marime
-	call _Drept
-	add esp, 8
+	push culoare
+	push gros
+	push latime
+	push lungime
+	push y
+	push x
+	call _Drept_gol 
+	add esp, 24
+	popa
+endm
+
+_Drept_plin  proc
+	push EBP
+	mov EBP, ESP 
+	mov ecx, [ebp+20]
+	mov eax, [ebp+ 8]
+	;corp procedura
+looping:
+	linie_verticala eax, [ebp+12], [ebp+16],[ebp+24]
+	inc eax
+	loop looping 
+	;end procedura
+	mov ESP, EBP
+	pop EBP
+	ret
+_Drept_plin endp
+
+drept_plin macro x, y,lungime,latime,culoare
+	pusha
+	push culoare
+	push latime
+	push lungime
+	push y
+	push x
+	call _Drept_plin
+	add esp, 20
 	popa
 endm
 ; functia de desenare - se apeleaza la fiecare click
@@ -369,42 +353,7 @@ afisare_litere:
 	div ebx
 	add edx, '0'
 	make_text_macro edx, area, 10, 10
-	
-	;scriem un mesaj
-	make_text_macro 'P', area, 110, 100
-	make_text_macro 'R', area, 120, 100
-	make_text_macro 'O', area, 130, 100
-	make_text_macro 'I', area, 140, 100
-	make_text_macro 'E', area, 150, 100
-	make_text_macro 'C', area, 160, 100
-	make_text_macro 'T', area, 170, 100
-	
-	make_text_macro 'L', area, 130, 120
-	make_text_macro 'A', area, 140, 120
-	
-	make_text_macro 'A', area, 100, 140
-	make_text_macro 'S', area, 110, 140
-	make_text_macro 'A', area, 120, 140
-	make_text_macro 'M', area, 130, 140
-	make_text_macro 'B', area, 140, 140
-	make_text_macro 'L', area, 150, 140
-	make_text_macro 'A', area, 160, 140
-	make_text_macro 'R', area, 170, 140
-	make_text_macro 'E', area, 180, 140
 
-	;drept 0ffffffh, buton_x, buton_y, buton_size
-	pusha
-	rdtsc
-	mov edx, 0
-	mov ebx, 0ffffffh
-	div ebx
-	make_pixel buton_x, buton_y, edx
-	make_pixel buton_x+1, buton_y, edx
-	make_pixel buton_x, buton_y+1, edx
-	make_pixel buton_x+1, buton_y+1, edx
-	popa
-	; make_pixel buton_x, buton_y, 0ff0000h
-	
 final_draw:
 	popa
 	mov esp, ebp
